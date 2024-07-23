@@ -1,4 +1,7 @@
-#! /usr/bin/env lua
+--#! /usr/bin/env lua
+
+-- Original script from https://github.com/daxliar/submerger
+--9.08.2019 - set_basetime support added by Oli
 
 -- Default colors to use when writing the merged values
 -- they have to be valid html color codes as used inside the <font> tag
@@ -84,8 +87,10 @@ function import_srt( filename )
           table.insert(srts, generate_entry(current_start_time, current_end_time, current_text ) )
         else
           if current_text == "" then
+	    	aegisub.debug.out("\n=="..tostring(current_index)..":"..tostring(trimmed_text))
             current_text = trimmed_text
           else
+	    	aegisub.debug.out("\n=="..tostring(current_index).."+"..tostring(trimmed_text))
             current_text = current_text .. " " .. trimmed_text
           end
         end
@@ -212,15 +217,36 @@ function merge_srts( srt_a, srt_b )
   return srts
 end
 
+function setContains(set, key)
+    return set[key] ~= nil
+end
+
+function hasprop(line,prop) 
+	return (setContains(line,prop))
+end
+
+-- This function should be called before seconds_to_str_timestamp/ str_timestamp_to_seconds
+function set_basetime(srt) 
+	local basetime=1 -- Normaly basetime for srt is the second
+	if(#srt) then
+	   line=srt[1]
+	   if(hasprop(line,"layer")) then --but for the line object of a selected line in aegisub
+		basetime=1000    --times are in ms so we have to adjust basetime
+	   end
+	end
+       return basetime
+end
+
 -- Writes srt data to a file
 function write_srt( filename, srt )
   if srt ~= nil then
     local file = io.open(filename, "w")
     if file ~= nil then
+      local basetime=set_basetime(srt) 
       for k,v in pairs(srt) do
         file:write(string.format( "%s\n", tostring(k)))
-        local start_time = seconds_to_str_timestamp(v["start_time"])
-        local end_time = seconds_to_str_timestamp(v["end_time"])
+        local start_time = seconds_to_str_timestamp(v["start_time"]/basetime)
+        local end_time = seconds_to_str_timestamp(v["end_time"]/basetime)
         file:write(string.format( "%s --> %s\n", start_time, end_time))
         file:write(string.format( "%s\n\n", v["text"] ))
       end
@@ -235,17 +261,17 @@ function write_srt( filename, srt )
 end
 
 -- Check if running as library or as a program
-if pcall(debug.getlocal, 4, 1) then
-  print("You are using " .. arg[0] .. " as a library")
-else
-  local num_args = #arg
-  if num_args >= 3 or num_args <= 5 then
-
-    default_color_a = arg[4] or default_color_a
-    default_color_b = arg[5] or default_color_b
-
-    write_srt( arg[3], merge_srts( import_srt(arg[1]), import_srt(arg[2]) ) )
-  else
-    print( "Usage: " .. arg[0] .. " <input srt file 1> <input srt file 2> <output srt file> [html color code 1] [html color code 2]")
-  end
-end
+--if pcall(debug.getlocal, 4, 1) then
+--  print("You are using " .. arg[0] .. " as a library")
+--else
+--  local num_args = #arg
+--  if num_args >= 3 or num_args <= 5 then
+--
+--    default_color_a = arg[4] or default_color_a
+--    default_color_b = arg[5] or default_color_b
+--
+--    write_srt( arg[3], merge_srts( import_srt(arg[1]), import_srt(arg[2]) ) )
+--  else
+--    print( "Usage: " .. arg[0] .. " <input srt file 1> <input srt file 2> <output srt file> [html color code 1] [html color code 2]")
+--  end
+--end
